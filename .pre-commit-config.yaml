@@ -1,0 +1,9 @@
+repos:
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.109.2   # then run: pre-commit autoupdate
+    hooks:
+      - id: terraform_fmt
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0   # same
+    hooks:
+      - id: gitleaks
