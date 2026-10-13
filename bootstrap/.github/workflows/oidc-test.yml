@@ -1,4 +1,4 @@
-name: oidc-test
+name: oidc-test #trigger test
 
 on:
   pull_request:
