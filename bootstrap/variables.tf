@@ -26,3 +26,23 @@ variable "state_bucket_name" {
   type        = string
   default     = "ramprasath326-multi-region-tfstate-use2"
 }
+
+#variables for OIDC authentications
+
+variable "github_owner" {
+  description = "GitHub user or org that owns the repo."
+  type        = string
+  default     = "Ramprasath326"
+}
+
+variable "github_repo" {
+  description = "Repository allowed to assume the roles."
+  type        = string
+  default     = "Multi-region-env-terraform"
+}
+
+variable "environments" {
+  description = "Environments that get an apply role."
+  type        = set(string)
+  default     = ["dev", "stage", "prod"]
+}
