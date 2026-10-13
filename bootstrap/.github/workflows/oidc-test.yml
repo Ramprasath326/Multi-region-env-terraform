@@ -1,4 +1,4 @@
-name: oidc-test #trigger test
+name: oidc-test #trigger test workflow to verify OIDC role assumption works correctly
 
 on:
   pull_request:
