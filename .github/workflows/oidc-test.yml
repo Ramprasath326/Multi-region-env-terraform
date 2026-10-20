@@ -1,0 +1,38 @@
+name: oidc-test
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/oidc-test.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  whoami:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: check account variable
+        env:
+          ACCT: ${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          echo "length: ${#ACCT}"
+          echo "last4: ${ACCT: -4}"
+      - name: show oidc claims
+        run: |
+          python3 - <<'PY'
+          import os, json, base64, urllib.request
+          url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"] + "&audience=sts.amazonaws.com"
+          req = urllib.request.Request(url, headers={"Authorization": "bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]})
+          tok = json.load(urllib.request.urlopen(req))["value"]
+          p = tok.split(".")[1]
+          p += "=" * (-len(p) % 4)
+          c = json.loads(base64.urlsafe_b64decode(p))
+          print({k: c[k] for k in ("sub", "aud", "repository")})
+          PY
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-tf-plan
+          aws-region: us-east-2
+      - run: aws sts get-caller-identity
