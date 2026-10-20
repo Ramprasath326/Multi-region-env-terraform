@@ -46,3 +46,16 @@ variable "environments" {
   type        = set(string)
   default     = ["dev", "stage", "prod"]
 }
+
+#adding github repo and user IDs
+variable "github_owner_id" {
+  description = "Immutable GitHub user ID of the repo owner."
+  type        = string
+  default     = "164841396"
+}
+
+variable "github_repo_id" {
+  description = "Immutable GitHub repository ID."
+  type        = string
+  default     = "1408922232"
+}
