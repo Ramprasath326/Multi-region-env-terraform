@@ -29,3 +29,20 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "nat_mode" {
+  description = "none, single (one shared NAT) or per_az (one NAT per AZ)."
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "single", "per_az"], var.nat_mode)
+    error_message = "nat_mode must be none, single or per_az."
+  }
+}
+
+variable "enable_s3_endpoint" {
+  description = "Create a free S3 gateway endpoint on the private route tables."
+  type        = bool
+  default     = true
+}
