@@ -21,3 +21,8 @@ variable "az_count" {
   type    = number
   default = 2
 }
+
+variable "nat_mode" {
+  type    = string
+  default = "none"
+}

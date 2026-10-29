@@ -17,3 +17,11 @@ output "private_route_table_ids" {
 output "azs" {
   value = local.azs
 }
+
+output "nat_gateway_ids" {
+  value = { for az, n in aws_nat_gateway.this : az => n.id }
+}
+
+output "s3_endpoint_id" {
+  value = one(aws_vpc_endpoint.s3[*].id)
+}
