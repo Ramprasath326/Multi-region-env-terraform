@@ -3,6 +3,9 @@ repos:
     rev: v1.109.2   # then run: pre-commit autoupdate
     hooks:
       - id: terraform_fmt
+      - id: terraform_tflint
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0   # same
     hooks:
