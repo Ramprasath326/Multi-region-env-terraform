@@ -1,0 +1,137 @@
+name: terraform-pr
+
+on:
+  pull_request:
+
+concurrency:
+  group: terraform-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+      any: ${{ steps.set.outputs.any }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: set
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE...$HEAD")
+          echo "changed files:"; echo "$changed"
+          all=$(find envs -mindepth 2 -maxdepth 2 -type d | sort)
+          if echo "$changed" | grep -qE '^(modules/|\.github/workflows/terraform-pr\.yml)'; then
+            sel="$all"
+          else
+            sel=""
+            for d in $all; do
+              if echo "$changed" | grep -q "^$d/"; then sel="$sel$d"$'\n'; fi
+            done
+          fi
+          json=$(printf '%s' "$sel" | jq -R -s -c 'split("\n") | map(select(length>0)) | map({dir: ., env: (split("/")[1]), region: (split("/")[2])})')
+          echo "matrix={\"include\":$json}" >> "$GITHUB_OUTPUT"
+          if [ "$json" = "[]" ]; then echo "any=false" >> "$GITHUB_OUTPUT"; else echo "any=true" >> "$GITHUB_OUTPUT"; fi
+
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: tfv
+        run: echo "v=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ steps.tfv.outputs.v }}
+          terraform_wrapper: false
+      - name: fmt
+        run: terraform fmt -check -recursive -diff
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+      - name: tflint
+        run: |
+          tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
+          tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl"
+      - name: checkov (report only for now)
+        run: |
+          pipx install checkov
+          checkov -d . --framework terraform --quiet --compact --soft-fail
+
+  plan:
+    needs: detect
+    if: needs.detect.outputs.any == 'true' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: mask account id
+        env:
+          ACCT: ${{ vars.AWS_ACCOUNT_ID }}
+        run: echo "::add-mask::$ACCT"
+      - id: tfv
+        run: echo "v=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ steps.tfv.outputs.v }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-tf-plan
+          aws-region: ${{ matrix.region }}
+      - name: init
+        working-directory: ${{ matrix.dir }}
+        run: terraform init -input=false
+      - name: plan
+        working-directory: ${{ matrix.dir }}
+        env:
+          TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          terraform plan -input=false -lock-timeout=60s -no-color -var-file=${{ matrix.env }}.tfvars -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+      - name: comment plan on the pr
+        if: ${{ !cancelled() }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ACCT: ${{ vars.AWS_ACCOUNT_ID }}
+          DIR: ${{ matrix.dir }}
+        with:
+          script: |
+            const fs = require('fs');
+            const dir = process.env.DIR;
+            let plan = 'The plan failed or produced no output. See the run log.';
+            const p = `${dir}/plan.txt`;
+            if (fs.existsSync(p)) plan = fs.readFileSync(p, 'utf8');
+            plan = plan.split(process.env.ACCT).join('************');
+            if (plan.length > 60000) plan = plan.slice(0, 60000) + '\n... truncated';
+            const marker = `<!-- tf-plan:${dir} -->`;
+            const body = `${marker}\n### Terraform plan: \`${dir}\`\n\n<details><summary>Show plan</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n</details>`;
+            const { data: comments } = await github.rest.issues.listComments({ ...context.repo, issue_number: context.issue.number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            }
+
+  gate:
+    if: always()
+    needs: [detect, static, plan]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: all required jobs passed
+        run: |
+          echo "detect=${{ needs.detect.result }} static=${{ needs.static.result }} plan=${{ needs.plan.result }}"
+          [ "${{ needs.detect.result }}" = "success" ] || exit 1
+          [ "${{ needs.static.result }}" = "success" ] || exit 1
+          [ "${{ needs.plan.result }}" = "success" ] || [ "${{ needs.plan.result }}" = "skipped" ] || exit 1
