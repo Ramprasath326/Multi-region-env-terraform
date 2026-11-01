@@ -6,6 +6,7 @@ module "vpc" {
   az_count   = var.az_count
   nat_mode   = var.nat_mode
 }
+
 module "ecr" {
   source = "../../../modules/ecr"
 
@@ -26,6 +27,23 @@ module "alb" {
 
 data "aws_region" "current" {}
 
+# Demo secret: Terraform generates the value so nothing sensitive lives in the repo.
+# In real use the value is set out-of-band and Terraform only manages the secret itself.
+resource "random_password" "app" {
+  length  = 24
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "app" {
+  name                    = "${var.env}/app/secret-key"
+  recovery_window_in_days = var.env == "prod" ? 30 : 0
+}
+
+resource "aws_secretsmanager_secret_version" "app" {
+  secret_id     = aws_secretsmanager_secret.app.id
+  secret_string = random_password.app.result
+}
+
 module "ecs_service" {
   count  = var.enable_service ? 1 : 0
   source = "../../../modules/ecs-service"
@@ -38,7 +56,8 @@ module "ecs_service" {
   attach_to_alb         = var.enable_alb
   target_group_arn      = one(module.alb[*].target_group_arn)
   alb_security_group_id = one(module.alb[*].security_group_id)
+  secrets               = { APP_SECRET = aws_secretsmanager_secret.app.arn }
 
-  # wait for NAT and routes before tasks try to pull the image
-  depends_on = [module.vpc]
+  # NAT and routes first, listener before the service registers, secret value before tasks read it
+  depends_on = [module.vpc, module.alb, aws_secretsmanager_secret_version.app]
 }
