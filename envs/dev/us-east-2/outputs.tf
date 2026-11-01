@@ -12,3 +12,7 @@ output "ecr_repository_url" {
 output "alb_dns_name" {
   value = one(module.alb[*].dns_name)
 }
+
+output "ecs_cluster_name" {
+  value = one(module.ecs_service[*].cluster_name)
+}
