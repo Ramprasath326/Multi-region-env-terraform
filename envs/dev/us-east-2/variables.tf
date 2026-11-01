@@ -26,3 +26,8 @@ variable "nat_mode" {
   type    = string
   default = "none"
 }
+variable "enable_alb" {
+  description = "Create the ALB. It bills hourly, so keep it off unless testing."
+  type        = bool
+  default     = false
+}
