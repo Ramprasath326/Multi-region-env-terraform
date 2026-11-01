@@ -54,3 +54,15 @@ The ALB bills hourly, so each env has an enable_alb flag (count on the module ca
 ## 016 ALB is HTTP-only in this practice setup
 No domain, so no ACM certificate. Production would terminate TLS on 443 and redirect port 80. The ALB security group allows egress only to the VPC CIDR on the target port, and the ECS security group will accept traffic only from the ALB's.
 Trade-off: Checkov flags missing HTTPS, WAF and access logs. Accepted for a short-lived practice resource.
+
+## 017 Separate execution role and task role
+The execution role belongs to ECS (pull images, write logs, read secrets at start). The task role is the application's own identity and starts empty.
+Why: the app should never inherit permissions that only the platform needs.
+
+## 018 Dev tasks run in private subnets, NAT only during test windows
+VPC interface endpoints for ECR and logs cost more per hour than one NAT. So dev keeps nat_mode none and the service off, and a test PR turns both on, with a teardown PR after.
+Trade-off: a manual step per test, but nothing bills in between.
+
+## 019 Task egress limited to HTTPS
+The service security group allows outbound 443 only, and inbound only from the ALB's security group.
+Trade-off: an app that needs other ports needs an explicit rule.

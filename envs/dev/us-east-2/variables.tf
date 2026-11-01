@@ -31,3 +31,15 @@ variable "enable_alb" {
   type        = bool
   default     = false
 }
+
+variable "enable_service" {
+  description = "Create the ECS service. Needs NAT egress and bills a little, so keep it off unless testing."
+  type        = bool
+  default     = false
+}
+
+variable "container_image" {
+  description = "Image for the service. Placeholder until the pipeline pushes to ECR."
+  type        = string
+  default     = "public.ecr.aws/docker/library/nginx:stable"
+}
