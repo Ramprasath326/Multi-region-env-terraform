@@ -43,3 +43,14 @@ Trade-off: version bumps need a reviewed PR instead of happening silently.
 ## 013 Lint locally and in CI, Checkov in CI only
 pre-commit runs fmt, tflint and gitleaks on every commit for fast feedback. CI repeats the checks as the enforcement point, because local hooks can be skipped.
 Why Checkov stays CI-only: it is slower to install and noisy on a practice account, so it is not worth blocking commits on.
+
+## 014 ECR: immutable tags, scan on push, lifecycle rules
+Immutable tags keep rollbacks reliable, lifecycle rules stop storage cost growing, and force_delete is on except in prod.
+Trade-off: no overwriting `latest`, so the pipeline pushes unique tags (git SHA).
+
+## 015 Expensive resources sit behind an enable toggle
+The ALB bills hourly, so each env has an enable_alb flag (count on the module call). Turning it on or off is a PR, so the pipeline owns creating and destroying it and nothing is left running by accident.
+
+## 016 ALB is HTTP-only in this practice setup
+No domain, so no ACM certificate. Production would terminate TLS on 443 and redirect port 80. The ALB security group allows egress only to the VPC CIDR on the target port, and the ECS security group will accept traffic only from the ALB's.
+Trade-off: Checkov flags missing HTTPS, WAF and access logs. Accepted for a short-lived practice resource.
