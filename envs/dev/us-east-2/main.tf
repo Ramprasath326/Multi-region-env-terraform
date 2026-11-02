@@ -27,21 +27,11 @@ module "alb" {
 
 data "aws_region" "current" {}
 
-# Demo secret: Terraform generates the value so nothing sensitive lives in the repo.
-# In real use the value is set out-of-band and Terraform only manages the secret itself.
-resource "random_password" "app" {
-  length  = 24
-  special = false
-}
-
+# The secret container is managed here. Its VALUE is set out-of-band, because the
+# read-only plan role must never be able to read secret values.
 resource "aws_secretsmanager_secret" "app" {
   name                    = "${var.env}/app/secret-key"
   recovery_window_in_days = var.env == "prod" ? 30 : 0
-}
-
-resource "aws_secretsmanager_secret_version" "app" {
-  secret_id     = aws_secretsmanager_secret.app.id
-  secret_string = random_password.app.result
 }
 
 module "ecs_service" {
@@ -58,6 +48,6 @@ module "ecs_service" {
   alb_security_group_id = one(module.alb[*].security_group_id)
   secrets               = { APP_SECRET = aws_secretsmanager_secret.app.arn }
 
-  # NAT and routes first, listener before the service registers, secret value before tasks read it
-  depends_on = [module.vpc, module.alb, aws_secretsmanager_secret_version.app]
+  # NAT and routes first, and the listener before the service registers
+  depends_on = [module.vpc, module.alb]
 }
