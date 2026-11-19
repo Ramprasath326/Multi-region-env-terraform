@@ -73,3 +73,7 @@ The ECS execution role may read exactly one secret ARN. The task definition hold
 ## 021 Terraform does not manage secret values (supersedes the demo in 020)
 The plan role is read-only by design and runs on PR code, so it must not be able to read secret values. Refreshing an aws_secretsmanager_secret_version needs GetSecretValue, which broke every PR plan once the secret existed. Terraform now manages only the secret container. The value is set with put-secret-value before the service is enabled in a new environment.
 Trade-off: one manual step per environment, in exchange for keeping secret values out of Terraform state and out of PR runs.
+
+## 022 Moved to a new AWS account
+The previous trial account was closed, so everything was rebuilt from code. The state bucket has a new name. The GitHub OIDC provider is now created by bootstrap, because the new account has none (this supersedes 004). Dev started switched off.
+Lesson: keep state in a bucket the code can recreate, and capture evidence outside the account.

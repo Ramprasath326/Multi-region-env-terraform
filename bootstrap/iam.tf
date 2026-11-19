@@ -1,16 +1,6 @@
-data "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
-}
-
-
-#locals {
-#  oidc_provider_arn = data.aws_iam_openid_connect_provider.github.arn
-#  repo_sub          = "repo:${var.github_owner}/${var.github_repo}"
-#}
-
 #adding repo and user IDs to locals to avoid issues with repo renames or transfers
 locals {
-  oidc_provider_arn = data.aws_iam_openid_connect_provider.github.arn
+  oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
   repo_sub          = "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
 }
 

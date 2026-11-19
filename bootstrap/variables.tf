@@ -24,7 +24,7 @@ variable "project" {
 variable "state_bucket_name" {
   description = "Globally unique S3 bucket name for Terraform state."
   type        = string
-  default     = "ramprasath326-multi-region-tfstate-use2"
+  default     = "ramprasath326-multi-region-tfstate-v2-use2"
 }
 
 #variables for OIDC authentications
